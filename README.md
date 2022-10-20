@@ -1,5 +1,4 @@
-# multi_view_active_learning
-
+# Rethinking the Data Annotation Process for Multi-view 3D Pose Estimation with Active Learning and Self-Training
 
 ## LICENSE
 
