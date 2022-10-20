@@ -1,0 +1,42 @@
+EXPR_NAME: "SAL-T-P-RESNET"
+EXPR_TYPE: "SAL"
+COMMENT: "TRIANGULATION STRATEGY. RESNET."
+RANDOM_SEED: 1307
+
+AL:
+  STRATEGY: "TRIANGULATION"
+  START_ITER: 1
+  PREVIOUS_AL_LOG_DIR: "manifold://oculus-nimble-tensorboard/tree/fung/exprs/AUG-P-RESNET-FIRST-ITER-08.04.2021:18:49.695776"
+
+SAL:
+  NUM_FRAMES:
+    - 25
+    - 25
+    - 25
+    - 25
+    - 35
+    - 35
+    - 35
+    - 35
+    - 35
+    - 35
+  # CLUSTER_FILE_PATH: "manifold://oculus-nimble-tensorboard/tree/fung/panoptics-pose-clusters.json"
+
+DATA:
+  TYPE: "panoptic"
+  NUM_JOINTS: 19
+  SIGMA: 1.
+  PSEUDO_LABEL_SIGMA: 1.
+  NUM_AUG: 2
+  AUG_MAGNITUDE: 20
+  USE_ROTATION: TRUE
+  USE_CONST_AUG_MAGNITUDE: FALSE
+
+POSE_ESTIMATOR:
+  TYPE: "POSE_RESNET"
+
+TRAIN:
+  BATCH_SIZE: 2
+  INIT_WEIGHT: "manifold://oculus-nimble/tree/public_datasets/active_learning/checkpoints/pose_resnet_50_256x256.pth"
+  RESTORE_FROM: ""
+  LOSS_CLIP_VALUE: 10.

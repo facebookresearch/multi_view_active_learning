@@ -1,0 +1,32 @@
+EXPR_NAME: "AUG-T-P-HR"
+EXPR_TYPE: "AL"
+COMMENT: "Triangulation STRATEGY. HRNet."
+RANDOM_SEED: 1307
+
+AL:
+  STRATEGY: "TRIANGULATION"
+  START_ITER: 1
+  PREVIOUS_AL_LOG_DIR: "manifold://oculus-nimble-tensorboard/tree/fung/exprs/AUG-P-HR-FIRST-ITER-08.04.2021:19:24.012413"
+
+DATA:
+  TYPE: "panoptic"
+  NUM_JOINTS: 19
+  NUM_AUG: 2
+  AUG_MAGNITUDE: 10
+  USE_ROTATION: TRUE
+  USE_CONST_AUG_MAGNITUDE: FALSE
+  SIGMA: 2.
+
+POSE_ESTIMATOR:
+  TYPE: "HRNET"
+  HRNET:
+    PRETRAINED_LAYERS:
+      - "conv1"
+      - "bn1"
+      - "conv2"
+      - "bn2"
+
+TRAIN:
+  INIT_WEIGHT: "manifold://oculus-nimble/tree/public_datasets/active_learning/checkpoints/pose_hrnet_w32_256x256.pth"
+  RESTORE_FROM: ""
+  LOSS_CLIP_VALUE: 10.

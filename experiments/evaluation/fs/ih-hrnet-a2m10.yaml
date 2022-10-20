@@ -1,0 +1,16 @@
+EXPR_NAME: "EVAL-FS-IH-HR-A2M10-06.23.2021:11:03.013236"
+EXPR_TYPE: "EVAL"
+COMMENT: "EVALUATION."
+
+LOG_DIR: "manifold://oculus-nimble-tensorboard/tree/fung/exprs"
+
+AL:
+  INFERENCE:
+    RESTORE_FROM: "manifold://oculus-nimble-tensorboard/tree/fung/exprs/FS-IH-HR-A2M10-06.23.2021:11:03.013236/FULLY_SUPERVISED/checkpoints/CKPT-FINAL.pth"
+
+DATA:
+  TYPE: "ih26m"
+  NUM_JOINTS: 42
+
+POSE_ESTIMATOR:
+  TYPE: "HRNET"

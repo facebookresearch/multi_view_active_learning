@@ -1,0 +1,22 @@
+load("@fbcode_macros//build_defs:python_library.bzl", "python_library")
+
+oncall("fblearner_flow_sdk_devx")
+
+python_library(
+    name = "dataset",
+    srcs = glob(["*.py"]),
+    resources = [
+        "train_val_split.json",
+    ],
+    deps = [
+        "fbsource//third-party/pypi/numpy:numpy",
+        "fbsource//third-party/pypi/yacs:yacs",
+        "//caffe2:torch",
+        "//fair_infra/data/iopath/iopath:core",
+        "//fair_infra/data/prefetcher:prefetcher",
+        "//fblearner/flow/projects/nimble/multi_view_active_learning/dataset/ih26m_utils:ih26m_common_cams",
+        "//fblearner/flow/projects/nimble/multi_view_active_learning/utils:utils",
+        "//libfb/py:parutil",
+        "//python/wheel/pillow:pillow",
+    ],
+)

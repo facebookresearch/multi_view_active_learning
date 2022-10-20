@@ -1,0 +1,19 @@
+EXPR_NAME: "FS-P-RESNET-A2M10"
+EXPR_TYPE: "SUPERVISED"
+COMMENT: "Fully Supervised Training of PoseResNet on Panoptics."
+RANDOM_SEED: 1307
+
+DATA:
+  TYPE: "panoptic"
+  NUM_JOINTS: 19
+  SIGMA: 1.
+  NUM_AUG: 2
+  AUG_MAGNITUDE: 20
+
+POSE_ESTIMATOR:
+  TYPE: "POSE_RESNET"
+
+TRAIN:
+  BATCH_SIZE: 2
+  INIT_WEIGHT: "manifold://oculus-nimble/tree/public_datasets/active_learning/checkpoints/pose_resnet_50_256x256.pth"
+  RESTORE_FROM: ""

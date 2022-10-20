@@ -1,0 +1,47 @@
+EXPR_NAME: "SAL-R-P-HR"
+EXPR_TYPE: "SAL"
+COMMENT: "Random STRATEGY. HRNet. 50-50."
+RANDOM_SEED: 1307
+
+AL:
+  STRATEGY: "RANDOM"
+  START_ITER: 1
+  PREVIOUS_AL_LOG_DIR: "manifold://oculus-nimble-tensorboard/tree/fung/exprs/AUG-P-HR-FIRST-ITER-08.04.2021:19:24.012413"
+
+SAL:
+  NUM_FRAMES:
+    - 25
+    - 25
+    - 25
+    - 25
+    - 35
+    - 35
+    - 35
+    - 35
+    - 35
+    - 35
+  # CLUSTER_FILE_PATH: "manifold://oculus-nimble-tensorboard/tree/fung/panoptics-pose-clusters.json"
+
+DATA:
+  TYPE: "panoptic"
+  NUM_JOINTS: 19
+  SIGMA: 2.
+  PSEUDO_LABEL_SIGMA: 2.
+  NUM_AUG: 2
+  AUG_MAGNITUDE: 10
+  USE_ROTATION: TRUE
+  USE_CONST_AUG_MAGNITUDE: FALSE
+
+POSE_ESTIMATOR:
+  TYPE: "HRNET"
+  HRNET:
+    PRETRAINED_LAYERS:
+      - "conv1"
+      - "bn1"
+      - "conv2"
+      - "bn2"
+
+TRAIN:
+  INIT_WEIGHT: "manifold://oculus-nimble/tree/public_datasets/active_learning/checkpoints/pose_hrnet_w32_256x256.pth"
+  RESTORE_FROM: ""
+  LOSS_CLIP_VALUE: 10.

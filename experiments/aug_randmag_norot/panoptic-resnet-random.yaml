@@ -1,0 +1,27 @@
+EXPR_NAME: "AUG-R-P-RESNET"
+EXPR_TYPE: "AL"
+COMMENT: "Random STRATEGY. RESNET."
+RANDOM_SEED: 1307
+
+AL:
+  STRATEGY: "RANDOM"
+  START_ITER: 1
+  PREVIOUS_AL_LOG_DIR: "manifold://oculus-nimble-tensorboard/tree/fung/exprs/AUG-P-RESNET-FIRST-ITER-08.04.2021:18:49.695776"
+
+DATA:
+  TYPE: "panoptic"
+  NUM_JOINTS: 19
+  NUM_AUG: 2
+  AUG_MAGNITUDE: 20
+  USE_ROTATION: FALSE
+  USE_CONST_AUG_MAGNITUDE: FALSE
+  SIGMA: 1.
+
+POSE_ESTIMATOR:
+  TYPE: "POSE_RESNET"
+
+TRAIN:
+  BATCH_SIZE: 2
+  INIT_WEIGHT: "manifold://oculus-nimble/tree/public_datasets/active_learning/checkpoints/pose_resnet_50_256x256.pth"
+  RESTORE_FROM: ""
+  LOSS_CLIP_VALUE: 10.

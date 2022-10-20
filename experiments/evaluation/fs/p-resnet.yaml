@@ -1,0 +1,16 @@
+EXPR_NAME: "EVAL-FS-P-RESNET-06.23.2021:10:59.685476"
+EXPR_TYPE: "EVAL"
+COMMENT: "EVALUATION."
+
+LOG_DIR: "manifold://oculus-nimble-tensorboard/tree/fung/exprs"
+
+AL:
+  INFERENCE:
+    RESTORE_FROM: "manifold://oculus-nimble-tensorboard/tree/fung/exprs/FS-P-RESNET-06.23.2021:10:59.685476/FULLY_SUPERVISED/checkpoints/CKPT-FINAL.pth"
+
+DATA:
+  TYPE: "panoptic"
+  NUM_JOINTS: 19
+
+POSE_ESTIMATOR:
+  TYPE: "POSE_RESNET"

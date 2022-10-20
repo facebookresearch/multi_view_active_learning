@@ -1,0 +1,25 @@
+EXPR_NAME: "FS-P-HR-A2M10"
+EXPR_TYPE: "SUPERVISED"
+COMMENT: "Fully Supervised Training of HRNet on Panoptics."
+RANDOM_SEED: 1307
+
+DATA:
+  TYPE: "panoptic"
+  NUM_JOINTS: 19
+  SIGMA: 2.
+  NUM_AUG: 2
+  AUG_MAGNITUDE: 10
+
+POSE_ESTIMATOR:
+  TYPE: "HRNET"
+  HRNET:
+    PRETRAINED_LAYERS:
+      - "conv1"
+      - "bn1"
+      - "conv2"
+      - "bn2"
+
+TRAIN:
+  BATCH_SIZE: 2
+  INIT_WEIGHT: "manifold://oculus-nimble/tree/public_datasets/active_learning/checkpoints/pose_hrnet_w32_256x256.pth"
+  RESTORE_FROM: ""

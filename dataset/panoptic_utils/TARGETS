@@ -1,0 +1,36 @@
+load("@fbcode_macros//build_defs:python_binary.bzl", "python_binary")
+
+oncall("fblearner_flow_sdk_devx")
+
+python_binary(
+    name = "aggregate_labels",
+    srcs = ["aggregate_labels.py"],
+    main_module = "fblearner.flow.projects.nimble.multi_view_active_learning.dataset.panoptic_utils.aggregate_labels",
+    deps = [
+        "fbsource//third-party/pypi/numpy:numpy",
+        "fbsource//third-party/pypi/tqdm:tqdm",
+    ],
+)
+
+python_binary(
+    name = "upload_raw_cmu_images",
+    srcs = ["upload_raw_cmu_images.py"],
+    main_module = "fblearner.flow.projects.nimble.multi_view_active_learning.dataset.panoptic_utils.upload_raw_cmu_images",
+    deps = [
+        "fbsource//third-party/pypi/imageio:imageio",
+        "fbsource//third-party/pypi/numpy:numpy",
+        "fbsource//third-party/pypi/tqdm:tqdm",
+        "//python/wheel/pillow:pillow",
+    ],
+)
+
+python_binary(
+    name = "compute_gt_boxes",
+    srcs = ["compute_gt_boxes.py"],
+    main_module = "fblearner.flow.projects.nimble.multi_view_active_learning.dataset.panoptic_utils.compute_gt_boxes",
+    deps = [
+        "fbsource//third-party/pypi/numpy:numpy",
+        "fbsource//third-party/pypi/tqdm:tqdm",
+        "//fblearner/flow/projects/nimble/multi_view_active_learning/utils:utils",
+    ],
+)

@@ -1,0 +1,24 @@
+EXPR_NAME: "EVAL_PANOPTIC-HR-R-AUG-4-M-5-06.14.2021:21:18.861830"
+EXPR_TYPE: "AL_EVAL"
+COMMENT: "EVALUATION."
+
+LOG_DIR: "manifold://oculus-nimble-tensorboard/tree/fung/exprs"
+
+AL:
+  STRATEGY: "RANDOM"
+  INITIAL_AMOUNT: 50
+  ITER_AMOUNT: 50
+  START_ITER: 0
+  ITERATIONS: 11
+  INFERENCE:
+    TRAINING_EXPR_NAME: "PANOPTIC-HR-R-AUG-4-M-5-06.14.2021:21:18.861830"
+
+DATA:
+  TYPE: "panoptic"
+  NUM_JOINTS: 19
+  SIGMA: 2.
+  PANOPTIC:
+    TRAIN_VAL_SPLIT: "fblearner/flow/projects/users/fung/dataset/train_val_split_8view.json"
+
+POSE_ESTIMATOR:
+  TYPE: "HRNET"

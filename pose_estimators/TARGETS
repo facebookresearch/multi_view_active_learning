@@ -1,0 +1,30 @@
+load("@fbcode_macros//build_defs:python_library.bzl", "python_library")
+
+oncall("fblearner_flow_sdk_devx")
+
+python_library(
+    name = "pose_estimators",
+    srcs = glob(
+        ["*.py"],
+        exclude = [
+            "loss.py",
+        ],
+    ),
+    base_module = "fblearner.flow.projects.nimble.multi_view_active_learning.pose_estimators",
+    deps = [
+        "fbsource//third-party/pypi/yacs:yacs",
+        "//caffe2:torch",
+        "//fblearner/flow/projects/nimble/multi_view_active_learning/utils:utils",
+        "//pytorch/manifold:patch",
+        "//pytorch/vision:torchvision",
+    ],
+)
+
+python_library(
+    name = "pose_estimator_loss",
+    srcs = ["loss.py"],
+    base_module = "fblearner.flow.projects.nimble.multi_view_active_learning.pose_estimators",
+    deps = [
+        "//caffe2:torch",
+    ],
+)
