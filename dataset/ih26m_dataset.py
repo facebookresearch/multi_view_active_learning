@@ -8,7 +8,6 @@ import json
 import os
 
 import numpy as np
-from fair_infra.data.prefetcher.add_prefetcher import Prefetch
 
 from . import dataset
 from .ih26m_utils.ih26m_common_cams import get_default_common_cams
@@ -183,10 +182,3 @@ class InterHand26MDataset(dataset.ActiveLearningDataset):
         cam["K"] = K
         cam["dist"] = None
         return cam
-
-
-@Prefetch(memcache_key_prefix="oculus-nimble", seed=None)
-class PrefetchInterHand26MDataset(InterHand26MDataset):
-    def get_data_paths(self, idx):
-        frame = self.data[idx]
-        return [frame["views"][camera]["path"] for camera in frame["views"]]

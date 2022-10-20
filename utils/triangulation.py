@@ -10,14 +10,11 @@ import random
 import kornia
 import numpy as np
 import torch
-from fblearner.flow.projects.nimble.multi_view_active_learning.pose_estimators.loss import (
-    Pose2DMeanSquaredError,
-)
 from PIL import Image
+from pose_estimators.loss import Pose2DMeanSquaredError
 from scipy.optimize import least_squares
 
 from .evaluation import get_scaled_pred_corrdinates
-
 
 IMAGENET_MEAN, IMAGENET_STD = (
     np.array([0.485, 0.456, 0.406]),
@@ -194,7 +191,8 @@ def triangulation(
     if use_soft_argmax:
         keypoints_2d = (
             (
-                kornia.spatial_soft_argmax2d(heatmaps, normalized_coordinates=False)
+                kornia.spatial_soft_argmax2d(
+                    heatmaps, normalized_coordinates=False)
                 * stride
             )
             .cpu()
@@ -253,7 +251,8 @@ def _compute_xe(keypoints_3d, proj_matricies, pred_heatmaps, sigma):
             exponent = torch.sum((grid - labels) ** 2, dim=-1)
             reprojected_heatmap = torch.exp(-exponent / (2.0 * (sigma**2)))
             mse_error += loss.pose_2d_mse(
-                pred_heatmaps[view_id, kp_id : kp_id + 1], reprojected_heatmap.cuda()
+                pred_heatmaps[view_id, kp_id: kp_id +
+                              1], reprojected_heatmap.cuda()
             )
     return mse_error
 
@@ -308,9 +307,11 @@ def _triangulate_ransac(
     inlier_proj_matricies = proj_matricies[inlier_list]
     inlier_points = points[inlier_list]
 
-    keypoint_3d_in_base_camera = _triangulate_dlt(inlier_proj_matricies, inlier_points)
+    keypoint_3d_in_base_camera = _triangulate_dlt(
+        inlier_proj_matricies, inlier_points)
     reprojection_error_vector = _calc_reprojection_error_matrix(
-        np.array([keypoint_3d_in_base_camera]), inlier_points, inlier_proj_matricies
+        np.array([keypoint_3d_in_base_camera]
+                 ), inlier_points, inlier_proj_matricies
     )[0]
     reprojection_error_mean = np.mean(reprojection_error_vector)
 
@@ -329,7 +330,8 @@ def _triangulate_ransac(
 
         keypoint_3d_in_base_camera = res.x
         reprojection_error_vector = _calc_reprojection_error_matrix(
-            np.array([keypoint_3d_in_base_camera]), inlier_points, inlier_proj_matricies
+            np.array([keypoint_3d_in_base_camera]
+                     ), inlier_points, inlier_proj_matricies
         )[0]
         reprojection_error_mean = np.mean(reprojection_error_vector)
 
@@ -353,8 +355,10 @@ def _triangulate_dlt(proj_matricies, points):
     n_views = len(proj_matricies)
     A = np.zeros((2 * n_views, 4))
     for j in range(len(proj_matricies)):
-        A[j * 2 + 0] = points[j][0] * proj_matricies[j][2, :] - proj_matricies[j][0, :]
-        A[j * 2 + 1] = points[j][1] * proj_matricies[j][2, :] - proj_matricies[j][1, :]
+        A[j * 2 + 0] = points[j][0] * \
+            proj_matricies[j][2, :] - proj_matricies[j][0, :]
+        A[j * 2 + 1] = points[j][1] * \
+            proj_matricies[j][2, :] - proj_matricies[j][1, :]
 
     u, s, vh = np.linalg.svd(A, full_matrices=False)
     point_3d_homo = vh[3, :]

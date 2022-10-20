@@ -6,7 +6,7 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
-from fblearner.flow.util.visualization_utils import summary_writer
+from torch.utils.tensorboard import summary_writer
 
 from .triangulation import denormalize_image
 

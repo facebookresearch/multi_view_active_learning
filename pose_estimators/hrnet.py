@@ -1,13 +1,17 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
 from __future__ import absolute_import, division, print_function
 
 import torch
-import torch.manifold.patch
 import torch.nn as nn
-from fblearner.flow.projects.nimble.multi_view_active_learning.utils import get_logger
+from utils import get_logger
 
 from .config import get_default_configs
 from .pose_estimator import PoseEstimator
-
 
 BN_MOMENTUM = 0.1
 
@@ -62,7 +66,8 @@ class Bottleneck(nn.Module):
         self.conv3 = nn.Conv2d(
             planes, planes * self.expansion, kernel_size=1, bias=False
         )
-        self.bn3 = nn.BatchNorm2d(planes * self.expansion, momentum=BN_MOMENTUM)
+        self.bn3 = nn.BatchNorm2d(
+            planes * self.expansion, momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
@@ -172,10 +177,12 @@ class HighResolutionModule(nn.Module):
                 downsample,
             )
         )
-        self.num_inchannels[branch_index] = num_channels[branch_index] * block.expansion
+        self.num_inchannels[branch_index] = num_channels[branch_index] * \
+            block.expansion
         for _ in range(1, num_blocks[branch_index]):
             layers.append(
-                block(self.num_inchannels[branch_index], num_channels[branch_index])
+                block(self.num_inchannels[branch_index],
+                      num_channels[branch_index])
             )
 
         return nn.Sequential(*layers)
@@ -184,7 +191,8 @@ class HighResolutionModule(nn.Module):
         branches = []
 
         for i in range(num_branches):
-            branches.append(self._make_one_branch(i, block, num_blocks, num_channels))
+            branches.append(self._make_one_branch(
+                i, block, num_blocks, num_channels))
 
         return nn.ModuleList(branches)
 
@@ -210,7 +218,8 @@ class HighResolutionModule(nn.Module):
                                 bias=False,
                             ),
                             nn.BatchNorm2d(num_inchannels[i]),
-                            nn.Upsample(scale_factor=2 ** (j - i), mode="nearest"),
+                            nn.Upsample(scale_factor=2 **
+                                        (j - i), mode="nearest"),
                         )
                     )
                 elif j == i:
@@ -291,9 +300,11 @@ class PoseHighResolutionNet(PoseEstimator):
         self.inplanes = 64
         super(PoseHighResolutionNet, self).__init__(num_joints=num_joints)
 
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=2, padding=1, bias=False)
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3,
+                               stride=2, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(64, momentum=BN_MOMENTUM)
-        self.conv2 = nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1, bias=False)
+        self.conv2 = nn.Conv2d(64, 64, kernel_size=3,
+                               stride=2, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(64, momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
         self.layer1 = self._make_layer(Bottleneck, 64, 4)
@@ -313,7 +324,8 @@ class PoseHighResolutionNet(PoseEstimator):
         num_channels = [
             num_channels[i] * block.expansion for i in range(len(num_channels))
         ]
-        self.transition2 = self._make_transition_layer(pre_stage_channels, num_channels)
+        self.transition2 = self._make_transition_layer(
+            pre_stage_channels, num_channels)
         self.stage3, pre_stage_channels = self._make_stage(
             self.hrnet_cfg.STAGE3, num_channels
         )
@@ -323,7 +335,8 @@ class PoseHighResolutionNet(PoseEstimator):
         num_channels = [
             num_channels[i] * block.expansion for i in range(len(num_channels))
         ]
-        self.transition3 = self._make_transition_layer(pre_stage_channels, num_channels)
+        self.transition3 = self._make_transition_layer(
+            pre_stage_channels, num_channels)
         self.stage4, pre_stage_channels = self._make_stage(
             self.hrnet_cfg.STAGE4, num_channels, multi_scale_output=False
         )
@@ -389,7 +402,8 @@ class PoseHighResolutionNet(PoseEstimator):
                     )
                     conv3x3s.append(
                         nn.Sequential(
-                            nn.Conv2d(inchannels, outchannels, 3, 2, 1, bias=False),
+                            nn.Conv2d(inchannels, outchannels,
+                                      3, 2, 1, bias=False),
                             nn.BatchNorm2d(outchannels),
                             nn.ReLU(inplace=True),
                         )
@@ -504,7 +518,8 @@ class PoseHighResolutionNet(PoseEstimator):
                         nn.init.constant_(m.bias, 0)
 
         pretrained_state_dict = torch.load(path_to_weights)
-        self._logger.info("loading pretrained model {}".format(path_to_weights))
+        self._logger.info(
+            "loading pretrained model {}".format(path_to_weights))
 
         need_init_state_dict = {}
         for name, m in pretrained_state_dict.items():

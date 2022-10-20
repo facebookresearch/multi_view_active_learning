@@ -14,27 +14,15 @@ from heapq import nlargest
 
 import numpy as np
 import torch
-from fair_infra.data.prefetcher.dataset_prefetcher import (
-    DatasetPrefetcher,
-    PrefetchDistributedSampler,
-)
-from fblearner.flow.projects.nimble.multi_view_active_learning.pose_estimators.loss import (
-    Pose2DMeanSquaredError,
-)
-from fblearner.flow.projects.nimble.multi_view_active_learning.utils import (
-    coreset,
-    evaluation,
-    get_logger,
-    TqdmToLogger,
-    triangulation,
-)
-from fblearner.flow.util.visualization_utils import summary_writer
+from torch.utils.tensorboard import summary_writer
 from iopath.common.file_io import PathManager
-from iopath.fb.manifold import ManifoldPathHandler
 from skimage.feature import peak_local_max
 from sklearn.cluster import KMeans
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, DistributedSampler
 from tqdm import tqdm
+
+from pose_estimators.loss import Pose2DMeanSquaredError
+from utils import TqdmToLogger, coreset, evaluation, get_logger, triangulation
 
 
 class ActiveLearningStrategy:
@@ -43,7 +31,6 @@ class ActiveLearningStrategy:
         self.al_cfg = al_cfg
         self.num_joints = al_cfg.DATA.NUM_JOINTS
         self._pathmgr = PathManager()
-        self._pathmgr.register_handler(ManifoldPathHandler())
         if self.al_cfg.DATA.TYPE == "panoptic":
             self.joint_root_index = 2
         else:
@@ -57,7 +44,7 @@ class ActiveLearningStrategy:
                     kp = np.array(clusters[guid])
                     kp = (
                         kp[0:3, :]
-                        - kp[0:3, self.joint_root_index : self.joint_root_index + 1]
+                        - kp[0:3, self.joint_root_index: self.joint_root_index + 1]
                     )
                     kp_values.append(kp.flatten())
                 self.kmeans = KMeans(
@@ -100,7 +87,8 @@ class ActiveLearningStrategy:
                             sal_dict["inlier_count"][guid] for guid in sal_guids
                         ]
                         self.al_writer.add_histogram(
-                            "sal/inlier_count", np.array(inlier_count), iteration
+                            "sal/inlier_count", np.array(
+                                inlier_count), iteration
                         )
                         sal_metric = [
                             sal_dict["sal_metric"][guid] for guid in sal_guids
@@ -108,7 +96,8 @@ class ActiveLearningStrategy:
                         self.al_writer.add_histogram(
                             "sal/sal_metric", np.array(sal_metric), iteration
                         )
-                        al_metric = [sal_dict["al_metric"][guid] for guid in al_guids]
+                        al_metric = [sal_dict["al_metric"][guid]
+                                     for guid in al_guids]
                         self.al_writer.add_histogram(
                             "sal/al_metric", np.array(al_metric), iteration
                         )
@@ -153,8 +142,6 @@ class ActiveLearningStrategy:
             train_dataset,
             self.al_cfg.TRAIN.BATCH_SIZE,
             self.al_cfg.TRAIN.NUM_WORKERS,
-            self.al_cfg.TRAIN.LA_INTERVAL,
-            self.al_cfg.TRAIN.LA_SIZE,
         )
         if self.al_cfg.AL.CLUSTER.TYPE == "LOSS":
             checkpoint_file = self.al_cfg.AL.CLUSTER.RESTORE_FROM
@@ -184,7 +171,8 @@ class ActiveLearningStrategy:
                             data["3d_keypoints"][idx].cpu().numpy().tolist()
                         )
                 elif self.al_cfg.AL.CLUSTER.TYPE == "LOSS":
-                    heatmaps = self._compute_batch_heatmap(pose_estimator, data)
+                    heatmaps = self._compute_batch_heatmap(
+                        pose_estimator, data)
                     _, kp, w, h = heatmaps.shape
                     poses = np.array(data["pose"]).transpose()
                     frame_ids = np.array(data["frame_id"]).transpose()
@@ -278,11 +266,13 @@ class ActiveLearningStrategy:
 
     def prepare_al_experiments(self):
         self._logger.info("Prepare AL Experiments.")
-        checkpoints_dir = os.path.join(self.al_cfg.LOG_DIR, self.al_cfg.EXPR_NAME)
+        checkpoints_dir = os.path.join(
+            self.al_cfg.LOG_DIR, self.al_cfg.EXPR_NAME)
         if not self._pathmgr.isdir(checkpoints_dir):
             self._pathmgr.mkdirs(checkpoints_dir)
         self.al_writer = summary_writer(
-            log_dir=os.path.join(self.al_cfg.LOG_DIR, self.al_cfg.EXPR_NAME, "AL")
+            log_dir=os.path.join(self.al_cfg.LOG_DIR,
+                                 self.al_cfg.EXPR_NAME, "AL")
         )
         self.al_writer.add_text("comment", self.al_cfg.COMMENT, 0)
 
@@ -383,7 +373,8 @@ class ActiveLearningStrategy:
             if self._pathmgr.isfile(path_to_guids):
                 self._pathmgr.copy(path_to_guids, path_to_copy_to)
             else:
-                self._logger.warning("Path to GUIDs is not found: %s" % path_to_guids)
+                self._logger.warning(
+                    "Path to GUIDs is not found: %s" % path_to_guids)
             path_to_sal_guids = os.path.join(
                 self.al_cfg.AL.PREVIOUS_AL_LOG_DIR, "SAL-GUID-ITER-%d" % i
             )
@@ -409,8 +400,6 @@ class ActiveLearningStrategy:
             val_dataset,
             train_cfg.TRAIN.BATCH_SIZE,
             train_cfg.TRAIN.NUM_WORKERS,
-            train_cfg.TRAIN.LA_INTERVAL,
-            train_cfg.TRAIN.LA_SIZE,
         )
         loss = Pose2DMeanSquaredError()
         optimizer = torch.optim.Adam(
@@ -452,8 +441,6 @@ class ActiveLearningStrategy:
             train_dataset,
             train_cfg.TRAIN.BATCH_SIZE,
             train_cfg.TRAIN.NUM_WORKERS,
-            train_cfg.TRAIN.LA_INTERVAL,
-            train_cfg.TRAIN.LA_SIZE,
         )
         while early_stopping:
             epoch += 1
@@ -473,10 +460,12 @@ class ActiveLearningStrategy:
             for data in train_dataloader:
                 with torch.autograd.enable_grad():
                     optimizer.zero_grad()
-                    heatmaps = self._compute_batch_heatmap(pose_estimator, data)
+                    heatmaps = self._compute_batch_heatmap(
+                        pose_estimator, data)
                     gt_heatmap = data["gt_heatmap"].cuda()
                     per_view_joint_valid = (
-                        data["per_view_joint_valid"].type(torch.ByteTensor).cuda()
+                        data["per_view_joint_valid"].type(
+                            torch.ByteTensor).cuda()
                     )
                     batch_loss = self._compute_batch_loss(
                         gt_heatmap, heatmaps, per_view_joint_valid, loss
@@ -522,8 +511,10 @@ class ActiveLearningStrategy:
                     current_lr = optimizer.param_groups[0]["lr"]
                     if rank == 0:
                         writer.add_scalar("lr", current_lr, global_step)
-                        writer.add_scalar("3D MKPE", eval_results["mkpe"], global_step)
-                        self._log_loss_info(writer, epoch, global_step, avg_loss)
+                        writer.add_scalar(
+                            "3D MKPE", eval_results["mkpe"], global_step)
+                        self._log_loss_info(
+                            writer, epoch, global_step, avg_loss)
                         self._log_pck_info(
                             writer,
                             "3DPCK",
@@ -543,7 +534,8 @@ class ActiveLearningStrategy:
                         "GPU [%d] MEMORY USAGE: %.2f / %.2f GB."
                         % (
                             rank,
-                            torch.cuda.memory_reserved(rank) / (1024 * 1024 * 1024),
+                            torch.cuda.memory_reserved(
+                                rank) / (1024 * 1024 * 1024),
                             torch.cuda.get_device_properties(rank).total_memory
                             / (1024 * 1024 * 1024),
                         )
@@ -566,15 +558,18 @@ class ActiveLearningStrategy:
         )
         for val_data in val_dataloader:
             with torch.no_grad():
-                heatmaps = self._compute_batch_heatmap(pose_estimator, val_data)
+                heatmaps = self._compute_batch_heatmap(
+                    pose_estimator, val_data)
                 pred_labels = torch.Tensor(
-                    self._compute_pred_labels(pose_estimator, val_data, heatmaps)
+                    self._compute_pred_labels(
+                        pose_estimator, val_data, heatmaps)
                 ).cuda()
             gt_label = val_data["2d_after_crop"].reshape([-1, 19, 2]).cuda()
             pred_list = [
                 torch.zeros_like(pred_labels) for _ in range(self.al_cfg.NUM_GPUS)
             ]
-            gt_list = [torch.zeros_like(gt_label) for _ in range(self.al_cfg.NUM_GPUS)]
+            gt_list = [torch.zeros_like(gt_label)
+                       for _ in range(self.al_cfg.NUM_GPUS)]
             torch.distributed.all_gather(pred_list, pred_labels)
             torch.distributed.all_gather(gt_list, gt_label)
             all_pred_labels += pred_list
@@ -604,7 +599,8 @@ class ActiveLearningStrategy:
             batch_valid_kp = val_data["joint_valid"].cuda()
             with torch.no_grad():
                 batch_size = len(batch_3d_label)
-                heatmaps = self._compute_batch_heatmap(pose_estimator, val_data)
+                heatmaps = self._compute_batch_heatmap(
+                    pose_estimator, val_data)
                 _, kp, w, h = heatmaps.shape
                 heatmaps = heatmaps.view([batch_size, -1, kp, w, h])
                 for idx in range(batch_size):
@@ -637,11 +633,13 @@ class ActiveLearningStrategy:
                     valid_joints += valid_list
             pbar.update()
         pbar.close()
-        mkpe = evaluation.compute_mkpe(pred_3d_labels, gt_3d_labels, valid_joints)
+        mkpe = evaluation.compute_mkpe(
+            pred_3d_labels, gt_3d_labels, valid_joints)
         thresholds, pcks = evaluation.compute_3d_pck_figure(
             pred_3d_labels, gt_3d_labels, valid_joints, self.num_joints
         )
-        results = {"mkpe": mkpe.data.item(), "thresholds": thresholds, "pcks": pcks}
+        results = {"mkpe": mkpe.data.item(), "thresholds": thresholds,
+                   "pcks": pcks}
         if self.al_cfg.DATA.TYPE == "panoptic":
             pckh_thresholds, pckh_pcks = evaluation.compute_3d_pckh_figure(
                 pred_3d_labels, gt_3d_labels, self.num_joints
@@ -694,7 +692,8 @@ class ActiveLearningStrategy:
         checkpoint_file = os.path.join(checkpoints_dir, ckpt_name)
         if self._pathmgr.isfile(checkpoint_file):
             self._pathmgr.rm(checkpoint_file)
-            self._logger.info("Overwriting checkpoint file: %s" % checkpoint_file)
+            self._logger.info("Overwriting checkpoint file: %s" %
+                              checkpoint_file)
         with self._pathmgr.open(checkpoint_file, "wb") as ckpt_file:
             torch.save(
                 {
@@ -713,28 +712,34 @@ class ActiveLearningStrategy:
 
     def _load_weights(self, cfg, pose_estimator):
         if cfg.TRAIN.RESTORE_FROM:
-            self._logger.info("Loading weights from %s" % cfg.TRAIN.RESTORE_FROM)
+            self._logger.info("Loading weights from %s" %
+                              cfg.TRAIN.RESTORE_FROM)
             with self._pathmgr.open(cfg.TRAIN.RESTORE_FROM, "rb") as ckpt_file:
                 ckpt = torch.load(io.BytesIO(ckpt_file.read()))
             pose_estimator.load_state_dict(ckpt["state_dict"], strict=True)
-            self._logger.info("Loaded weights from %s." % cfg.TRAIN.RESTORE_FROM)
+            self._logger.info("Loaded weights from %s." %
+                              cfg.TRAIN.RESTORE_FROM)
         elif cfg.TRAIN.INIT_WEIGHT:
-            self._logger.info("Initializing weights from %s." % cfg.TRAIN.INIT_WEIGHT)
+            self._logger.info("Initializing weights from %s." %
+                              cfg.TRAIN.INIT_WEIGHT)
             if cfg.POSE_ESTIMATOR.TYPE == "POSE_RESNET":
                 pretrained_state_dict = torch.load(cfg.TRAIN.INIT_WEIGHT)
                 del pretrained_state_dict["final_layer.weight"]
                 del pretrained_state_dict["final_layer.bias"]
-                pose_estimator.load_state_dict(pretrained_state_dict, strict=False)
+                pose_estimator.load_state_dict(
+                    pretrained_state_dict, strict=False)
             elif cfg.POSE_ESTIMATOR.TYPE == "HRNET":
                 pretrained_state_dict = torch.load(cfg.TRAIN.INIT_WEIGHT)
                 need_init_state_dict = {}
                 for name, m in pretrained_state_dict.items():
                     if (
-                        name.split(".")[0] in pose_estimator.module.pretrained_layers
+                        name.split(".")[
+                            0] in pose_estimator.module.pretrained_layers
                         or pose_estimator.module.pretrained_layers[0] == "*"
                     ):
                         need_init_state_dict[name] = m
-                pose_estimator.load_state_dict(need_init_state_dict, strict=False)
+                pose_estimator.load_state_dict(
+                    need_init_state_dict, strict=False)
         else:
             self._logger.info("Training from scratch.")
         return pose_estimator
@@ -744,21 +749,13 @@ class ActiveLearningStrategy:
         dataset,
         batch_size,
         num_workers,
-        la_interval,
-        la_size,
-        manifold_set_size=10,
     ):
-        dataset.prefetcher.set_sampler()
-        dataset.prefetcher.set_lookahead_params(
-            la_interval, la_size, 0, num_workers, manifold_set_size, "oculus-nimble"
-        )
-        sampler = PrefetchDistributedSampler(dataset, is_prefetch=False)
+        sampler = DistributedSampler(dataset)
         dataloader = DataLoader(
             dataset,
             batch_size=batch_size,
             num_workers=num_workers,
             sampler=sampler,
-            worker_init_fn=DatasetPrefetcher.worker_init,
         )
         return dataloader
 
@@ -766,8 +763,10 @@ class ActiveLearningStrategy:
     def _compute_batch_loss(gt_heatmap, heatmaps, per_view_joint_valid, loss):
         batch_size, num_view, num_joints, w, h = gt_heatmap.shape
         gt_heatmap = gt_heatmap.reshape([-1, num_joints, w, h])
-        per_view_joint_valid = per_view_joint_valid.reshape([-1, num_joints, 1, 1])
-        batch_loss = loss.pose_2d_mse(heatmaps, gt_heatmap, per_view_joint_valid)
+        per_view_joint_valid = per_view_joint_valid.reshape(
+            [-1, num_joints, 1, 1])
+        batch_loss = loss.pose_2d_mse(
+            heatmaps, gt_heatmap, per_view_joint_valid)
         return batch_loss
 
     @staticmethod
@@ -785,12 +784,14 @@ class ActiveLearningStrategy:
     def _compute_pred_labels(self, pose_estimator, data, heatmaps):
         boxes = data["square_box"].cuda()
         boxes = boxes.reshape([-1, 4])
-        pred_labels = evaluation.get_pred_coordinates(heatmaps, boxes, self.num_joints)
+        pred_labels = evaluation.get_pred_coordinates(
+            heatmaps, boxes, self.num_joints)
         return pred_labels
 
     def _log_loss_info(self, writer, epoch, global_step, avg_loss):
         self._logger.info(
-            "[EPOCH %d][STEP %d] AVG TRAIN LOSS: %.4f." % (epoch, global_step, avg_loss)
+            "[EPOCH %d][STEP %d] AVG TRAIN LOSS: %.4f." % (
+                epoch, global_step, avg_loss)
         )
         writer.add_scalar("loss/train", avg_loss, global_step)
         writer.add_scalar(
@@ -830,7 +831,8 @@ class ActiveLearningStrategy:
                 avg_pck,
                 global_step,
             )
-            figure = evaluation.plot_pckh_figure(thresholds, per_joint_pcks[kp_id])
+            figure = evaluation.plot_pckh_figure(
+                thresholds, per_joint_pcks[kp_id])
             writer.add_image(
                 "%s/keypoint-%d" % (eval_metric, kp_id),
                 figure,
@@ -847,16 +849,19 @@ class ActiveLearningStrategy:
 
     def _save_init_weight_for_al(self, pose_estimator, rank):
         pose_estimator = self._load_weights(self.al_cfg, pose_estimator)
-        checkpoints_dir = os.path.join(self.al_cfg.LOG_DIR, self.al_cfg.EXPR_NAME)
+        checkpoints_dir = os.path.join(
+            self.al_cfg.LOG_DIR, self.al_cfg.EXPR_NAME)
         init_checkpoint_file = os.path.join(checkpoints_dir, "INIT-WEIGHT.pth")
         if rank == 0:
             self._logger.info("Prepare initial weights for AL Experiments.")
             if not self._pathmgr.isdir(checkpoints_dir):
                 self._pathmgr.mkdirs(checkpoints_dir)
             with self._pathmgr.open(init_checkpoint_file, "wb") as ckpt_file:
-                torch.save({"state_dict": pose_estimator.state_dict()}, ckpt_file)
+                torch.save(
+                    {"state_dict": pose_estimator.state_dict()}, ckpt_file)
             self._logger.info(
-                "Initial Weights Checkpoint Saved at %s." % str(init_checkpoint_file)
+                "Initial Weights Checkpoint Saved at %s." % str(
+                    init_checkpoint_file)
             )
         return init_checkpoint_file
 
@@ -867,7 +872,8 @@ class ActiveLearningStrategy:
         if seed is None:
             seed = self.al_cfg.RANDOM_SEED
         random.seed(seed)
-        guids = random.sample(list(train_dataset.unlabeled_data.keys()), num_frames)
+        guids = random.sample(
+            list(train_dataset.unlabeled_data.keys()), num_frames)
         train_dataset.label_by_frame_guids(guids)
         return train_dataset, guids
 
@@ -880,7 +886,8 @@ class ActiveLearningStrategy:
         with self._pathmgr.open(checkpoint_file, "rb") as ckpt_file:
             ckpt = torch.load(io.BytesIO(ckpt_file.read()))
         pose_estimator.load_state_dict(ckpt["state_dict"], strict=True)
-        result = self._evaluate_all(iteration_idx, pose_estimator, val_dataloader)
+        result = self._evaluate_all(
+            iteration_idx, pose_estimator, val_dataloader)
 
         avg_pck_per_threshold = []
         for pck_dict in result["pcks"]:
@@ -902,8 +909,6 @@ class ActiveLearningStrategy:
             val_dataset,
             self.al_cfg.AL.INFERENCE.BATCH_SIZE,
             self.al_cfg.AL.INFERENCE.NUM_WORKERS,
-            self.al_cfg.AL.INFERENCE.LA_INTERVAL,
-            self.al_cfg.AL.INFERENCE.LA_SIZE,
         )
         return val_dataloader
 
@@ -922,8 +927,6 @@ class ActiveLearningStrategy:
             train_dataset,
             self.al_cfg.AL.INFERENCE.BATCH_SIZE,
             self.al_cfg.AL.INFERENCE.NUM_WORKERS,
-            self.al_cfg.AL.INFERENCE.LA_INTERVAL,
-            self.al_cfg.AL.INFERENCE.LA_SIZE,
         )
         sal_dict = self._compute_sal_dict(data_loader, pose_estimator)
         al_metric_dict = {
@@ -979,7 +982,7 @@ class ActiveLearningStrategy:
                     kp = np.array(sal_dict["pred_3d_keypoints"][guid]).T
                     kp = (
                         kp[0:3, :]
-                        - kp[0:3, self.joint_root_index : self.joint_root_index + 1]
+                        - kp[0:3, self.joint_root_index: self.joint_root_index + 1]
                     )
                     kp = kp.flatten()
                     cluster_id = self.kmeans.predict([kp])[0]
@@ -991,7 +994,8 @@ class ActiveLearningStrategy:
                     sal_guids[: 2 * pseudo_num_frames], pseudo_num_frames
                 )
 
-            self._logger.info("Pseudo-labeling %d frames." % len(sal_sampled_guids))
+            self._logger.info("Pseudo-labeling %d frames." %
+                              len(sal_sampled_guids))
             train_dataset.pseudo_label_by_frame_guids(
                 sal_sampled_guids, sal_dict["pred_3d_keypoints"]
             )
@@ -1055,7 +1059,8 @@ class ActiveLearningStrategy:
                         for _ in range(self.al_cfg.NUM_GPUS)
                     ]
                     sal_metric = torch.Tensor([results["metric"]]).cuda()
-                    sal_inlier_count = torch.Tensor([results["inlier_count"]]).cuda()
+                    sal_inlier_count = torch.Tensor(
+                        [results["inlier_count"]]).cuda()
                     sal_metric_list = [
                         torch.zeros_like(sal_metric)
                         for _ in range(self.al_cfg.NUM_GPUS)
@@ -1070,15 +1075,18 @@ class ActiveLearningStrategy:
                         al_metric = torch.tensor([results["metric"]]).cuda()
                     elif self.al_cfg.AL.STRATEGY == "MPE":
                         al_metric = torch.tensor(
-                            self._compute_mpe(heatmaps[idx], dp["joint_valid"][idx])
+                            self._compute_mpe(
+                                heatmaps[idx], dp["joint_valid"][idx])
                         ).cuda()
                     elif self.al_cfg.AL.STRATEGY == "HP":
                         al_metric = torch.tensor(
-                            self._compute_hp(heatmaps[idx], dp["joint_valid"][idx])
+                            self._compute_hp(
+                                heatmaps[idx], dp["joint_valid"][idx])
                         ).cuda()
                     elif self.al_cfg.AL.STRATEGY == "BSB":
                         al_metric = torch.tensor(
-                            self._compute_bsb(heatmaps[idx], dp["joint_valid"][idx])
+                            self._compute_bsb(
+                                heatmaps[idx], dp["joint_valid"][idx])
                         ).cuda()
                     elif self.al_cfg.AL.STRATEGY == "CORESET":
                         al_metric = torch.tensor(0.0).cuda()
@@ -1096,7 +1104,8 @@ class ActiveLearningStrategy:
                         torch.zeros_like(frame) for _ in range(self.al_cfg.NUM_GPUS)
                     ]
                     torch.distributed.all_gather(sal_metric_list, sal_metric)
-                    torch.distributed.all_gather(sal_inlier_list, sal_inlier_count)
+                    torch.distributed.all_gather(
+                        sal_inlier_list, sal_inlier_count)
                     torch.distributed.all_gather(al_metric_list, al_metric)
                     torch.distributed.all_gather(pred_list, pred_labels)
                     torch.distributed.all_gather(gt_list, gt_3d_label)
@@ -1125,7 +1134,8 @@ class ActiveLearningStrategy:
                         mkpe = evaluation.compute_mkpe(
                             [pred_3d_kp], [gt_3d_kp], [valid_joint]
                         )
-                        guid = "%s-%s" % (pose.data.item(), frame_id.data.item())
+                        guid = "%s-%s" % (pose.data.item(),
+                                          frame_id.data.item())
                         sal_dict["sal_metric"][guid] = sal_metric.data.item()
                         sal_dict["inlier_count"][guid] = sal_inlier.data.item()
                         sal_dict["pred_3d_keypoints"][guid] = (
@@ -1144,7 +1154,8 @@ class ActiveLearningStrategy:
             ents = np.array(ents)
             return np.std(ents)
         else:
-            raise NotImplementedError("AL.MPE_CONFIG should be either AVG or STD.")
+            raise NotImplementedError(
+                "AL.MPE_CONFIG should be either AVG or STD.")
 
     def _compute_mpes(self, heatmaps, joint_valid):
         heatmaps = heatmaps.cpu().numpy()
@@ -1157,7 +1168,8 @@ class ActiveLearningStrategy:
                 coordinates = peak_local_max(
                     heatmaps[view][kp], min_distance=2, indices=True
                 )
-                peaks = [heatmaps[view][kp][cood[0]][cood[1]] for cood in coordinates]
+                peaks = [heatmaps[view][kp][cood[0]][cood[1]]
+                         for cood in coordinates]
                 probs = np.exp(peaks) / sum(np.exp(peaks))
                 ent = sum(-prob * math.log(prob) for prob in probs)
                 ents.append(ent)
@@ -1187,7 +1199,8 @@ class ActiveLearningStrategy:
             for kp in range(num_kp):
                 if not joint_valid[kp]:
                     continue
-                joint_hm = torch.nn.functional.softmax(heatmaps[view][kp]).cpu().numpy()
+                joint_hm = torch.nn.functional.softmax(
+                    heatmaps[view][kp]).cpu().numpy()
                 coordinates = peak_local_max(
                     joint_hm, min_distance=2, indices=True, num_peaks=2
                 )

@@ -4,14 +4,11 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-from fblearner.flow.projects.nimble.multi_view_active_learning.dataset.config import (
-    get_default_data_configs,
-)
-from fblearner.flow.projects.nimble.multi_view_active_learning.pose_estimators.config import (
-    get_default_configs as get_default_pose_estimators_configs,
-)
 from yacs.config import CfgNode as CN
 
+from dataset.config import get_default_data_configs
+from pose_estimators.config import \
+    get_default_configs as get_default_pose_estimators_configs
 
 _C = CN()
 _C.EXPR_NAME = "EXPR"
@@ -69,8 +66,6 @@ _C.AL.INFERENCE.RESTORE_FROM = ""
 # Default. Do not change.
 _C.AL.INFERENCE.BATCH_SIZE = 2
 _C.AL.INFERENCE.NUM_WORKERS = 2
-_C.AL.INFERENCE.LA_INTERVAL = 64
-_C.AL.INFERENCE.LA_SIZE = 256
 
 _C.AL.CLUSTER = CN()
 # Cluster by LOSS or by POSE.
@@ -92,9 +87,6 @@ _C.TRAIN.VAL_SIZE = 320
 _C.TRAIN.BATCH_SIZE = 2
 _C.TRAIN.NUM_WORKERS = 2
 _C.TRAIN.LOG_EVERY_ITER = 500
-# Prefetch interval and size.
-_C.TRAIN.LA_INTERVAL = 64
-_C.TRAIN.LA_SIZE = 256
 
 _C.TRAIN.OPTIM = CN()
 _C.TRAIN.OPTIM.TOTAL_STEPS = 5000

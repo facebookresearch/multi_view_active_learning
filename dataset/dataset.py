@@ -11,12 +11,11 @@ from collections import OrderedDict
 
 import numpy as np
 import torch
-from fblearner.flow.projects.nimble.multi_view_active_learning.utils import (
+from utils import (
     get_logger,
     triangulation,
 )
 from iopath.common.file_io import PathManager
-from iopath.fb.manifold import ManifoldPathHandler
 from PIL import Image
 from torch.utils.data import Dataset
 
@@ -39,7 +38,6 @@ class ActiveLearningDataset(Dataset, abc.ABC):
         self.split = split
         self._logger = get_logger(__name__)
         self._pathmgr = PathManager()
-        self._pathmgr.register_handler(ManifoldPathHandler())
         self.unlabeled_data = OrderedDict()
         self.labeled_data = list()
         self.pseudo_labeled_data = list()

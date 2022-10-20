@@ -5,23 +5,21 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
+import argparse
 import json
 import os
 import tempfile
 from datetime import datetime
 from typing import List, NamedTuple
 
-import fblearner.flow.api as flow
 import numpy as np
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
-from libfb.py import parutil
 
 from . import config
-from .dataset.ih26m_dataset import PrefetchInterHand26MDataset
-from .dataset.panoptic_dataset import PrefetchCMUPanopticDataset
-from .pose_estimators.cpm import ConvolutionalPoseMachines
+from .dataset.ih26m_dataset import InterHand26MDataset
+from .dataset.panoptic_dataset import CMUPanopticDataset
 from .pose_estimators.hrnet import PoseHighResolutionNet
 from .pose_estimators.pose_resnet import PoseResNet
 from .strategy import ActiveLearningStrategy
@@ -61,7 +59,8 @@ def main(rank, cfg):
             amount = cfg.AL.ITER_AMOUNT
 
         train_dataset, val_dataset = build_datasets(cfg)
-        train_dataset = strategy.restore_dataset(train_dataset, cfg.AL.CURRENT_ITER)
+        train_dataset = strategy.restore_dataset(
+            train_dataset, cfg.AL.CURRENT_ITER)
         train_dataset = strategy.sample_next_batch(
             train_dataset,
             amount,
@@ -86,7 +85,8 @@ def main(rank, cfg):
         )
     elif cfg.EXPR_TYPE == "AL_EVAL":
         test_dataset = build_datasets(cfg)
-        result = strategy.run_al_eval(backbone_pose_estimator, test_dataset, rank)
+        result = strategy.run_al_eval(
+            backbone_pose_estimator, test_dataset, rank)
         if rank == 0:
             with open(cfg.RESULTS, "w") as f:
                 json.dump(result, f)
@@ -104,8 +104,8 @@ def main(rank, cfg):
 
 def build_datasets(cfg):
     datasets = {
-        "panoptic": PrefetchCMUPanopticDataset,
-        "ih26m": PrefetchInterHand26MDataset,
+        "panoptic": CMUPanopticDataset,
+        "ih26m": InterHand26MDataset,
     }
     if cfg.EXPR_TYPE == "AL_EVAL" or cfg.EXPR_TYPE == "EVAL":
         test_dataset = datasets[cfg.DATA.TYPE](
@@ -123,9 +123,7 @@ def build_datasets(cfg):
 
 
 def _build_ddp_model(cfg, rank):
-    if cfg.POSE_ESTIMATOR.TYPE == "CPM":
-        backbone_pose_estimator = ConvolutionalPoseMachines(cfg.DATA.NUM_JOINTS)
-    elif cfg.POSE_ESTIMATOR.TYPE == "POSE_RESNET":
+    if cfg.POSE_ESTIMATOR.TYPE == "POSE_RESNET":
         backbone_pose_estimator = PoseResNet(cfg.DATA.NUM_JOINTS)
     elif cfg.POSE_ESTIMATOR.TYPE == "HRNET":
         backbone_pose_estimator = PoseHighResolutionNet(
@@ -208,27 +206,25 @@ def prepare_output(cfg, eval_dict):
     )
 
 
-@flow.flow_async(
-    use_resource_prediction=False,
-    resource_requirements=flow.ResourceRequirements(gpu=8, memory="200g", cpu=40),
-    use_forkserver=True,
-)
-@flow.registered(owners=["kunhe"])
-@flow.typed()
-def run(config_file: str):
+if __name__ == "__main__":
+    argparser = argparse.ArgumentParser()
+    argparse.add_argument("--config_file", help="Path to experiment config file.", default="")
+    args = argparser.parse_args()
+    config_file = args.config_file
     cfg = config.get_default_configs()
-    cfg.merge_from_file(parutil.get_file_path(config_file))
+    cfg.merge_from_file(config_file)
 
     logger = get_logger("active_learning")
     logger.info("Merge configurations from %s." % str(config_file))
     logger.info("Experiment Type is " + cfg.EXPR_TYPE)
 
     cfg.NUM_GPUS = torch.cuda.device_count()
-    if cfg.EXPR_TYPE == "CLUSETER":
+    if cfg.EXPR_TYPE == "CLUSTER":
         cfg.NUM_GPUS = 1
     logger.info("Number of GPUs: %d." % cfg.NUM_GPUS)
 
-    cfg.EXPR_NAME = cfg.EXPR_NAME + "-" + datetime.now().strftime("%m.%d.%Y:%H:%M.%f")
+    cfg.EXPR_NAME = cfg.EXPR_NAME + "-" + \
+        datetime.now().strftime("%m.%d.%Y:%H:%M.%f")
     with tempfile.NamedTemporaryFile(delete=False, suffix=".dist_sync") as sync_file:
         cfg.INIT_METHOD = "file://" + sync_file.name
         logger.info("Init method: " + cfg.INIT_METHOD)
@@ -272,6 +268,6 @@ def run(config_file: str):
     try:
         with open(cfg.RESULTS) as f:
             result = json.load(f)
-        return prepare_output(cfg, result)
+        print(prepare_output(cfg, result))
     except FileNotFoundError:
-        return "Experiment type %s does not have output." % cfg.EXPR_TYPE
+        print("Experiment type %s does not have output." % cfg.EXPR_TYPE)
