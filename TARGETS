@@ -1,0 +1,51 @@
+load("@fbcode_macros//build_defs:python_library.bzl", "python_library")
+load("//bento:buck_macros.bzl", "bento_kernel")
+load("//fblearner/flow/projects:macros.bzl", "fblearner_flow_project_python_binary")
+
+oncall("fblearner_flow_sdk_devx")
+
+bento_kernel(
+    name = "sal_kernel",
+    deps = [
+        ":al_hpe_lib",
+    ],
+    external_deps = [],
+)
+
+fblearner_flow_project_python_binary(
+    # Flow requires that this be named "workflow";  please don't change it!
+    name = "workflow",
+    prepend_preload_deps = [
+        "//folly/experimental/exception_tracer:exception_tracer_callbacks",
+    ],
+    py_version = ">=3",
+    deps = [
+        ":al_hpe_lib",
+    ],
+)
+
+python_library(
+    name = "al_hpe_lib",
+    srcs = glob(
+        ["*.py"],
+    ),
+    base_module = "fblearner.flow.projects.nimble.multi_view_active_learning",
+    deps = [
+        "fbsource//third-party/pypi/numpy:numpy",
+        "fbsource//third-party/pypi/tqdm:tqdm",
+        "fbsource//third-party/pypi/yacs:yacs",
+        "//caffe2:torch",
+        "//fair_infra/data/iopath/iopath:core",
+        "//fair_infra/data/prefetcher:prefetcher",
+        "//fblearner/flow:api",
+        "//fblearner/flow/projects/nimble/multi_view_active_learning/dataset:dataset",
+        "//fblearner/flow/projects/nimble/multi_view_active_learning/experiments:al_hpe_experiments",  # @manual
+        "//fblearner/flow/projects/nimble/multi_view_active_learning/pose_estimators:pose_estimator_loss",
+        "//fblearner/flow/projects/nimble/multi_view_active_learning/pose_estimators:pose_estimators",
+        "//fblearner/flow/projects/nimble/multi_view_active_learning/utils:utils",
+        "//fblearner/flow/util:visualization_utils",
+        "//libfb/py:parutil",
+        "//python/wheel/scikit-image:scikit-image",
+        "//python/wheel/scikit-learn:scikit-learn",
+    ],
+)
